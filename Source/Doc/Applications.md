@@ -1,34 +1,5 @@
-!include(Common.inc)
-!def(document)(Applications)
----
-title: !product !document
-author: !author (mailto:!authmail)
-date: !date
-institution: !orgname
-documentclass: article
-toc: true
-toc-depth: 1
-classoption:
- - oneside
-papersize: letter
-geometry:
- - top=1.5in
- - bottom=1.5in
- - left=1.5in
- - right=1.5in
-# - showframe
-linestretch: 1.25
-colorlinks: true
-fontfamily: helvet
-fontsize: 12pt
-header-includes:
- - |
-   ```{=latex}
-   \renewcommand*{\familydefault}{\sfdefault}
-   ```
----
-
-`\clearpage  % new page after TOC`{=latex}
+$define{doc_title}{Applications}$
+$include{"Book.h"}$
 
 # Summary
 
@@ -76,7 +47,8 @@ found:
 | TALK        | Yes      | Yes        | Yes      |
 | RTC         | Yes      | Yes        | Yes      |
 | TIMER       | Yes      | Yes        | Yes      |
-| INTTEST     | Yes      | Yes        | Yes      |
+| CPUSPD      | Yes      | Yes        | Yes      |
+| INTTEST     | No       | Yes        | Yes      |
 | FAT         | No       | Yes        | Yes      |
 | TUNE        | No       | Yes        | Yes      |
 
@@ -195,6 +167,11 @@ system to fail and force you to reboot.
 This command is particularly sensitive to being matched to the
 appropriate version of the RomWBW ROM you are using. Be very careful
 to keep all copies of `ASSIGN.COM` up to date with your ROM.
+
+Additionally, the `ASSIGN` command must be able to adjust to CP/M 2.2
+vs. CP/M 3.  If you utilize an RSX that modifies the BDOS version
+returned, you are likely to have serious problems.  In this case, be
+sure to use `ASSIGN` prior to loading the RSX or after it is unloaded.
 
 ## Etymology
 
@@ -360,7 +337,7 @@ message.
 
 ## Etymology
 
-The `SYSCOPY` command is an original product and the source code is
+The `MODE` command is an original product and the source code is
 provided in the RomWBW distribution.
 
 `\clearpage`{=latex}
@@ -521,15 +498,20 @@ This application is provided by Will Sowerbutts.
 
 *`<filename>`* is the filename of the ROM image file
 
-Options: (access method is auto-detected by default)
+FLASH4 will auto-detect most parameters so additional options should not
+normally be required.
 
-| `/PARTIAL`: Allow flashing a large ROM from a smaller image file
+Options:
+
+| `/V`: Enable verbose output (one line per sector)
+| `/P` or `/PARTIAL`: Allow flashing a large ROM from a smaller image file
 | `/ROM`: Allow read-only use of unknown chip types
 | `/Z180DMA`: Force Z180 DMA engine
 | `/UNABIOS`: Force UNA BIOS bank switching
 | `/ROMWBW`: Force RomWBW (v2.6+) bank switching
 | `/ROMWBWOLD`: Force RomWBW (v2.5 and earlier) bank switching
 | `/P112`: Force P112 bank switching
+| `/N8VEMSBC`: Force N8VEM SBC (v1, v2), Zeta (v1) SBC bank switching
 
 ## Usage
 
@@ -949,6 +931,24 @@ accurately pace the sound file output. If no system timer is
 available, a delay loop is calculated instead. The delay loop will not
 be as accurate as the system timer.
 
+There are two modes of operations.  A direct hardware interface for the
+AY-3-8910 or YM2149 chips, or a compatibility layer thru HBIOS supporting
+the SN76489 chip.
+
+By default the application will attempt to interface directly to the sound
+chip.  The optional argument `--hbios` supplied after the filename, will
+enable the application to use the HBIOS sound driver.
+
+The HBIOS mode also support other switch as desribed below.
+
+| Switch      | Description                                            |
+| ----------- | ------------------------------------------------------ |
+|  `--hbios`  | Utilise HBIOS' sound driver                            |
+| `+t1`       | Play tune an octave higher                             |
+| `+t2`       | Play tune two octaves higher                           |
+| `-t1`       | Play tune an octave lower                              |
+| `-t2`       | Play tune two octaves lower                            |
+
 All RomWBW operating system boot disks include a selection of sound
 files in user area 3.
 
@@ -959,5 +959,72 @@ hardware interface code is specific to RomWBW. The sound file decoding
 software was adapted and embedded from pre-existing sources. The YM
 player code is from MYMPLAY 0.4 by Lieves!Tuore and the PT player code
 is (c)2004-2007 S.V.Bulba <vorobey@mail.khstu.ru>.
+
+The source code is provided in the RomWBW distribution.
+
+# CPUSPD
+
+The `CPUSPD` application is used to change the running speed and wait
+states of a RomWBW system.
+
+  The functionality is highly dependent on
+the capabilities of your system.
+
+At present, all Z180 systems can change their CPU speed and their
+wait states.  SBC and MBC systems may be able to change their CPU
+speed if the hardware supports it and it is enabled in the HBIOS
+configuration.
+
+## Syntax
+
+| `CPUSPD [`*`<speed>`*`[,[`*`<memws>`*`][,[`*`<iows>`*`]]]`
+
+*`<speed>`* is one of HALF, FULL, or DOUBLE.  
+*`<memws>`* is a number specifying the desired memory wait states.  
+*`<iows>`* is a number specifying the desired I/O wait states.
+
+## Usage
+
+Entering `CPUSPD` with no parameters will display the current CPU speed
+and wait state information of the running system.  Wait state
+information is not available for all systems.
+
+To modify the running speed of a system, you can specify the
+`*`<speed>`*` parameter.  To modify either or both of the wait
+states, you can enter the desired number.  Either or both of the wait
+state parameters may be omitted and the current wait state settings
+will remain in effect.
+
+## Notes
+
+The ability to modify the running speed and wait states of a system
+varies widely depending on the hardware capabilities and the HBIOS
+configuration settings.
+
+Note that it is frequently impossible to tell if a system is capable
+of dynamic speed changes.  This function makes the changes blindly.
+If an attempt is made to change the speed of a system
+that is definitely incapable of doing so, then an error result is
+returned.
+
+The `CPUSPD` command makes no attempt to ensure that the new CPU
+speed will actually work on the current hardware.  Setting a CPU
+speed that exceeds the capabilities of the system will result in
+unstable operation or a system stall.
+
+Some peripherals are dependant on the CPU speed.  For example, the Z180
+ASCI baud rate and system timer are derived from the CPU speed.  The
+CPUSPD applicastion will attempt to adjust these peripherals for
+correct operation after modifying the CPU speed.  However, in some
+cases this may not be possible.  The baud rate of ASCI ports have a
+limited set of divisors.  If there is no satisfactory divisor to
+retain the existing baud rate under the new CPU speed, then the baud
+rate of the ASCI port(s) will be affected.
+
+## Etymology
+
+The `CPUSPD` application was custom written for RomWBW. All of the
+hardware interface code is specific to RomWBW and the application will
+not operate correctly on non-RomWBW systems.
 
 The source code is provided in the RomWBW distribution.
